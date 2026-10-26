@@ -309,6 +309,54 @@ def Spyre_Select : SpyreOp_IntrinsicOp<
   }];
 }
 
+// compare_and_swap_max is the per-element kernel of a top-k accumulation loop.
+// Given the current candidate value/index and one running top-k slot value/index,
+// it returns:
+//   result0 (out_val)  - the loser of the comparison (feeds back to the FIFO output)
+//   result1 (out_idx)  - the loser's index
+//   result2 (new_slot_val)  - the winner, stored back into the top-k slot
+//   result3 (new_slot_idx)  - the winner's index
+// All four operands and all four results share one floating-point type.
+def Spyre_CompareAndSwapMax : SpyreOp_Op<"compare_and_swap_max",
+    [Pure, SameOperandsAndResultType]> {
+  let summary = "Conditionally swaps a candidate value into a top-k accumulator slot";
+
+  let description = [{
+    Compares `val` against `slot_val`. If `val > slot_val` the two are swapped
+    so that the larger value ends up in the slot; the indices follow their
+    paired values.
+
+    Operands:
+    - `val`       : the incoming candidate value
+    - `idx`       : index associated with `val`
+    - `slot_val`  : the current value held in one top-k slot
+    - `slot_idx`  : the index held in that slot
+
+    Results (in order):
+    0. `out_val`      : the value that loses (i.e. did not enter the slot)
+    1. `out_idx`      : the index paired with the loser
+    2. `new_slot_val` : the value that wins (i.e. now occupies the slot)
+    3. `new_slot_idx` : the index paired with the winner
+  }];
+
+  let arguments = (ins
+    AnyTypeOf<[F16, SpyreOp_DF16, F32]>:$val,
+    AnyTypeOf<[F16, SpyreOp_DF16, F32]>:$idx,
+    AnyTypeOf<[F16, SpyreOp_DF16, F32]>:$slot_val,
+    AnyTypeOf<[F16, SpyreOp_DF16, F32]>:$slot_idx
+  );
+  let results = (outs
+    AnyTypeOf<[F16, SpyreOp_DF16, F32]>:$out_val,
+    AnyTypeOf<[F16, SpyreOp_DF16, F32]>:$out_idx,
+    AnyTypeOf<[F16, SpyreOp_DF16, F32]>:$new_slot_val,
+    AnyTypeOf<[F16, SpyreOp_DF16, F32]>:$new_slot_idx
+  );
+
+  let assemblyFormat = [{
+    $val `,` $idx `,` $slot_val `,` $slot_idx attr-dict `:` type($out_val)
+  }];
+}
+
 // slice_reduction operates on a full stick at a time.
 def Spyre_SliceReduction : SpyreOp_Op<"slice_reduction",
     [Pure, SameOperandsAndResultType]> {
